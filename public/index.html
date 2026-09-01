@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PixelSentry — Responsive UI QA</title>
+<style>
+  :root {
+    --bg: #0f1720; --panel: #16212e; --panel-2: #1c2938; --line: #27384b;
+    --text: #e6edf3; --muted: #9fb0c0; --accent: #22c55e; --accent-2: #38bdf8;
+    --pass: #22c55e; --warn: #f59e0b; --fail: #ef4444;
+    --low: #64748b; --medium: #38bdf8; --high: #f59e0b; --critical: #ef4444;
+    --radius: 14px; --shadow: 0 10px 30px rgba(0,0,0,.35); font-synthesis: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(56,189,248,.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgba(34,197,94,.10), transparent 55%), var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5; min-height: 100vh;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 20px 80px; }
+  header.top { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .logo { width: 40px; height: 40px; border-radius: 11px; flex: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center; color: #06121a; font-weight: 800; box-shadow: var(--shadow); }
+  h1 { font-size: 1.35rem; margin: 0; letter-spacing: -.01em; }
+  .sub { color: var(--muted); font-size: .92rem; margin: 2px 0 20px; }
+  code { background: var(--panel); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); font-size: .82em; }
+
+  /* Main tabs */
+  .maintabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+  .maintab { padding: 10px 18px; cursor: pointer; color: var(--muted); font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .maintab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .maintab .em { margin-right: 7px; }
+  .panel { display: none; } .panel.active { display: block; }
+
+  .section-title { font-size: .82rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 22px 0 10px; }
+
+  /* Dropzone (upload) */
+  .dropzone { border: 1.5px dashed var(--line); border-radius: var(--radius);
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    padding: 34px 24px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+  .dropzone:hover { border-color: var(--accent-2); }
+  .dropzone.drag { border-color: var(--accent); background: var(--panel-2); }
+  .dz-icon { font-size: 30px; } .dz-title { font-weight: 600; margin-top: 6px; }
+  .dz-hint { color: var(--muted); font-size: .85rem; margin-top: 4px; }
+  input[type=file] { display: none; }
+
+  /* Model picker */
+  .models { display: flex; flex-wrap: wrap; gap: 10px; }
+  .model { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); background: var(--panel);
+    border-radius: 11px; padding: 10px 13px; cursor: pointer; user-select: none; font-size: .9rem; }
+  .model.sel { border-color: var(--accent); background: rgba(34,197,94,.08); }
+  .model.disabled { opacity: .5; cursor: not-allowed; }
+  .model input { accent-color: var(--accent); width: 16px; height: 16px; }
+  .model .ml { font-weight: 600; }
+  .pill { font-size: .66rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; letter-spacing: .03em; }
+  .pill.free { background: rgba(34,197,94,.16); color: var(--pass); }
+  .pill.paid { background: rgba(245,158,11,.16); color: var(--warn); }
+  .pill.nokey { background: rgba(239,68,68,.16); color: var(--fail); }
+
+  /* Capture config form */
+  .cfg { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px; }
+  .cfg .group { border: 1px solid var(--line); border-radius: 11px; background: var(--panel); padding: 12px; }
+  .cfg .group h4 { margin: 0 0 8px; font-size: .82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .cfg .list { max-height: 168px; overflow: auto; display: flex; flex-direction: column; gap: 5px; }
+  .cfg .list.small { max-height: none; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: .88rem; cursor: pointer; padding: 2px 3px; border-radius: 6px; }
+  .chk:hover { background: var(--panel-2); }
+  .chk input { accent-color: var(--accent); }
+  .cfg .grouphead { display: flex; justify-content: space-between; align-items: center; }
+  .cfg .grouphead a { font-size: .72rem; color: var(--accent-2); cursor: pointer; text-decoration: none; }
+  .website { color: var(--muted); font-size: .85rem; margin-bottom: 12px; }
+  .website b { color: var(--text); }
+
+  .actions { display: flex; gap: 12px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
+  button.primary { background: linear-gradient(135deg, var(--accent), #16a34a); color: #06121a; font-weight: 700;
+    border: none; border-radius: 11px; padding: 12px 22px; font-size: .95rem; cursor: pointer; box-shadow: var(--shadow); }
+  button.primary:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 11px; padding: 12px 18px; font-size: .9rem; cursor: pointer; }
+  button.ghost:hover { color: var(--text); border-color: var(--muted); }
+  .count { color: var(--muted); font-size: .85rem; }
+
+  /* Queue (upload thumbs) + gallery */
+  .queue, .gallery { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 12px; }
+  .thumb { position: relative; border: 1px solid var(--line); border-radius: 11px; overflow: hidden; background: var(--panel); }
+  .thumb.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .thumb .imgwrap { aspect-ratio: 4/3; overflow: hidden; background: var(--panel-2); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+  .thumb .tmeta { padding: 7px 9px; font-size: .68rem; color: var(--muted); }
+  .thumb .tmeta .tname { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thumb .tmeta .tags { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .thumb .tmeta .tag { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+  .thumb .rm { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
+    border: none; background: rgba(6,12,18,.75); color: #fff; cursor: pointer; font-size: 14px; line-height: 22px; padding: 0; }
+  .thumb .rm:hover { background: var(--fail); }
+  .thumb .pick { position: absolute; top: 6px; left: 6px; width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
+
+  .progress { margin-top: 18px; display: none; } .progress.on { display: block; }
+  .progress .track { height: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .progress .fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .3s ease; }
+  .progress .plabel { color: var(--muted); font-size: .82rem; margin-top: 8px; display: flex; justify-content: space-between; }
+
+  .banner { margin-top: 18px; padding: 12px 14px; border-radius: 11px; font-size: .86rem; border: 1px solid var(--line); background: var(--panel); }
+  .banner.warn { border-color: rgba(245,158,11,.5); background: rgba(245,158,11,.08); color: #fde68a; }
+  .banner.err { border-color: rgba(239,68,68,.5); background: rgba(239,68,68,.08); color: #fecaca; }
+  .hidden { display: none !important; }
+
+  .results { margin-top: 20px; display: grid; gap: 18px; }
+  .card { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); box-shadow: var(--shadow); }
+  .card .chead { padding: 16px 16px 0; }
+  .card .titlerow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .card .fname { font-weight: 700; word-break: break-all; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 800; padding: 4px 10px; border-radius: 999px; letter-spacing: .04em; }
+  .badge.PASS { background: rgba(34,197,94,.15); color: var(--pass); }
+  .badge.WARNING { background: rgba(245,158,11,.15); color: var(--warn); }
+  .badge.FAIL { background: rgba(239,68,68,.15); color: var(--fail); }
+  .badge.ERROR { background: rgba(239,68,68,.15); color: var(--fail); }
+  .card .dims { color: var(--muted); font-size: .8rem; margin-top: 4px; }
+
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 16px 0; }
+  .tab { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--panel-2);
+    border-radius: 10px 10px 0 0; padding: 8px 12px; cursor: pointer; font-size: .84rem; color: var(--muted); }
+  .tab.active { color: var(--text); border-color: var(--accent-2); background: var(--panel); border-bottom-color: var(--panel); }
+  .tab .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .tab .dot.PASS { background: var(--pass); } .tab .dot.WARNING { background: var(--warn); }
+  .tab .dot.FAIL { background: var(--fail); } .tab .dot.ERROR { background: var(--fail); }
+  .tab .best { font-size: .64rem; font-weight: 800; color: #06121a; background: var(--accent); border-radius: 999px; padding: 1px 6px; }
+  .tab .ic { font-size: .72rem; color: var(--muted); }
+
+  .cbody { display: flex; gap: 18px; padding: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); }
+  .summary { font-size: .92rem; } .conf { color: var(--muted); font-size: .8rem; margin-top: 6px; }
+  .verdictline { flex-basis: 100%; margin-bottom: 2px; }
+  .verdictline .badge { margin-right: 8px; }
+
+  .annot { position: relative; flex: none; width: 340px; max-width: 100%; border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden; background: var(--panel-2); align-self: flex-start; }
+  .annot img { width: 100%; display: block; }
+  .annot .box { position: absolute; border: 2px solid var(--warn); border-radius: 4px; box-shadow: 0 0 0 2px rgba(0,0,0,.25); pointer-events: none; }
+  .annot .box .tag { position: absolute; top: -11px; left: -11px; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--warn); color: #06121a; font-weight: 800; font-size: .72rem; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  .annot .box.LOW { border-color: var(--low); } .annot .box.LOW .tag { background: var(--low); color: #fff; }
+  .annot .box.MEDIUM { border-color: var(--medium); } .annot .box.MEDIUM .tag { background: var(--medium); }
+  .annot .box.HIGH { border-color: var(--high); } .annot .box.HIGH .tag { background: var(--high); }
+  .annot .box.CRITICAL { border-color: var(--critical); } .annot .box.CRITICAL .tag { background: var(--critical); color: #fff; }
+  .annot .box.on { box-shadow: 0 0 0 3px rgba(255,255,255,.5); }
+
+  .ilist { flex: 1; min-width: 240px; }
+  .issue { padding: 12px 0; border-top: 1px solid var(--line); }
+  .issue:first-child { border-top: none; }
+  .issue.on { background: rgba(56,189,248,.06); border-radius: 8px; padding: 12px; }
+  .issue .ihead { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .inum { width: 20px; height: 20px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--line); font-size: .72rem; font-weight: 800; display: grid; place-items: center; color: var(--text); }
+  .sev { font-size: .68rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; letter-spacing: .04em; }
+  .sev.LOW { background: rgba(100,116,139,.2); color: #cbd5e1; } .sev.MEDIUM { background: rgba(56,189,248,.18); color: var(--medium); }
+  .sev.HIGH { background: rgba(245,158,11,.18); color: var(--high); } .sev.CRITICAL { background: rgba(239,68,68,.2); color: var(--critical); }
+  .cat { font-size: .72rem; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; }
+  .issue .ititle { font-weight: 650; } .issue .idesc { color: var(--text); font-size: .9rem; margin-top: 6px; }
+  .issue .irow { color: var(--muted); font-size: .82rem; margin-top: 6px; } .issue .irow b { color: var(--text); font-weight: 600; }
+  .issue .rec { margin-top: 6px; font-size: .86rem; color: #bfe9cd; }
+  .clean { padding: 4px 0 8px; color: var(--muted); font-size: .9rem; }
+  .errline { color: #fecaca; font-size: .86rem; }
+
+  .overall { margin: 26px 0 6px; padding: 18px; border-radius: var(--radius); border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--panel), var(--panel-2)); display: flex; gap: 22px; flex-wrap: wrap; align-items: center; }
+  .stat { text-align: center; min-width: 72px; } .stat .n { font-size: 1.5rem; font-weight: 800; }
+  .stat .l { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .stat.pass .n { color: var(--pass); } .stat.warn .n { color: var(--warn); } .stat.fail .n { color: var(--fail); }
+
+  .foot { margin-top: 40px; color: var(--muted); font-size: .78rem; text-align: center; }
+  .spin { width: 16px; height: 16px; border: 2px solid rgba(6,18,26,.4); border-top-color: #06121a; border-radius: 50%; display: inline-block; animation: sp .7s linear infinite; vertical-align: -3px; margin-right: 8px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo" aria-label="PixelSentry logo">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#06121a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8" />
+        <path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8" />
+        <path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16" />
+        <path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16" />
+        <circle cx="12" cy="12" r="3.1" />
+        <circle cx="12" cy="12" r="0.4" fill="#06121a" />
+      </svg>
+    </div>
+    <div><h1>PixelSentry</h1></div>
+  </header>
+  <p class="sub">Responsive UI QA — capture your site (or upload screenshots), run free code checks and AI vision on each one, and get a status, summary, and full analysis with the affected areas boxed on the image.</p>
+
+  <div class="maintabs">
+    <div class="maintab active" data-panel="capture"><span class="em">📸</span>Capture from site</div>
+    <div class="maintab" data-panel="upload"><span class="em">🖼️</span>Upload screenshots</div>
+  </div>
+
+  <!-- CAPTURE PANEL -->
+  <div class="panel active" id="panel-capture">
+    <div class="website" id="website">Loading site config…</div>
+    <div class="cfg" id="cfg"></div>
+    <div class="actions">
+      <button class="primary" id="captureBtn" disabled>Capture screenshots</button>
+      <span class="count" id="comboCount"></span>
+    </div>
+    <div class="progress" id="captureProgress">
+      <div class="track"><div class="fill" id="captureFill"></div></div>
+      <div class="plabel"><span id="captureText">Capturing…</span><span id="capturePct">0%</span></div>
+    </div>
+    <div class="banner err hidden" id="captureErr"></div>
+
+    <div id="galleryWrap" class="hidden">
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Captured screenshots — pick which to evaluate</span>
+        <span><a href="#" id="selAll" style="color:var(--accent-2);font-size:.78rem;text-transform:none">select all</a> · <a href="#" id="selNone" style="color:var(--accent-2);font-size:.78rem;text-transform:none">none</a></span>
+      </div>
+      <div class="banner hidden" id="codeSummary" style="border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.07);color:#bfe9cd"></div>
+      <div class="gallery" id="gallery"></div>
+      <div class="actions">
+        <button class="primary" id="evalCaptureBtn" disabled>Evaluate selected</button>
+        <span class="count" id="galleryCount"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPLOAD PANEL -->
+  <div class="panel" id="panel-upload">
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload screenshots">
+      <div class="dz-icon">🖼️</div>
+      <div class="dz-title">Drop screenshots here, or click to browse</div>
+      <div class="dz-hint">PNG, JPG, WEBP, GIF · multiple files supported</div>
+      <input type="file" id="fileInput" accept="image/*" multiple />
+    </div>
+    <div class="cfg" style="margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+      <div class="group"><h4>Page / screen (override)</h4><input id="optPage" placeholder="auto from filename" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 11px;font-size:.9rem" /></div>
+      <div class="group"><h4>Browser (override)</h4><input id="optBrowser" placeholder="auto from filename" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 11px;font-size:.9rem" /></div>
+      <div class="group"><h4>Language (override)</h4><input id="optLang" placeholder="auto from filename" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 11px;font-size:.9rem" /></div>
+    </div>
+    <div class="queue" id="queue"></div>
+    <div class="actions">
+      <button class="primary" id="analyzeBtn" disabled>Analyze screenshots</button>
+      <button class="ghost hidden" id="clearBtn">Clear all</button>
+      <span class="count" id="count"></span>
+    </div>
+  </div>
+
+  <!-- SHARED: models + progress + results -->
+  <div class="section-title">Models to compare</div>
+  <div class="models" id="models"><span class="count">Loading providers…</span></div>
+
+  <div class="progress" id="progress">
+    <div class="track"><div class="fill" id="progressFill"></div></div>
+    <div class="plabel"><span id="progressText">Analyzing…</span><span id="progressPct">0%</span></div>
+  </div>
+
+  <div class="banner err hidden" id="errBanner"></div>
+  <div id="output"></div>
+
+  <div class="foot">
+    <div style="font-weight:600;color:var(--text)">PixelSentry</div>
+    <div style="margin-top:3px">© 2026 Luckindu Dissanayake | QA Engineer</div>
+    <div style="margin-top:8px;opacity:.7">API: <code>POST /analyze</code> · <code>POST /scan</code> · <code>GET /config</code> · <code>GET /providers</code></div>
+  </div>
+</div>
+
+<script>
+const state = { files: [], providers: [], selected: new Set(), cfg: null, gallery: [], picked: new Set() };
+const $ = (s) => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function uid() { return Math.random().toString(36).slice(2, 10); }
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+/* ---------- Main tab switching ---------- */
+document.querySelectorAll(".maintab").forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll(".maintab").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(x => x.classList.remove("active"));
+    t.classList.add("active");
+    $("#panel-" + t.dataset.panel).classList.add("active");
+  };
+});
+
+/* ---------- Providers (shared) ---------- */
+async function loadProviders() {
+  try {
+    const data = await (await fetch("/providers")).json();
+    state.providers = data.providers || [];
+    state.providers.forEach(p => { if (p.available) state.selected.add(p.name); });
+    renderModels();
+  } catch (err) { $("#models").innerHTML = '<span class="count">Could not load providers: ' + escapeHtml(err.message) + '</span>'; }
+}
+function renderModels() {
+  const el = $("#models"); el.innerHTML = "";
+  state.providers.forEach(p => {
+    const sel = state.selected.has(p.name);
+    const lab = document.createElement("label");
+    lab.className = "model" + (sel ? " sel" : "") + (p.available ? "" : " disabled");
+    const pill = p.available ? (p.free ? '<span class="pill free">free</span>' : '<span class="pill paid">paid</span>') : '<span class="pill nokey">no API key</span>';
+    lab.innerHTML = '<input type="checkbox" ' + (sel ? "checked" : "") + (p.available ? "" : " disabled") + ' data-p="' + p.name + '"><span class="ml">' + escapeHtml(p.label) + '</span>' + pill +
+      '<span style="color:var(--muted);font-size:.72rem">' + escapeHtml(p.model) + '</span>';
+    const cb = lab.querySelector("input");
+    cb.onchange = () => { cb.checked ? state.selected.add(p.name) : state.selected.delete(p.name); renderModels(); refreshButtons(); };
+    el.appendChild(lab);
+  });
+}
+
+/* ---------- Capture: config form ---------- */
+async function loadCfg() {
+  try {
+    const c = await (await fetch("/config")).json();
+    state.cfg = c;
+    $("#website").innerHTML = "Site: <b>" + escapeHtml(c.website) + "</b>" + (c.localeInPath ? " · locale in path" : "");
+    renderCfg();
+  } catch (err) { $("#website").textContent = "Could not load site config: " + err.message; }
+}
+const sel = { pages: new Set(), browsers: new Set(), languages: new Set(), viewports: new Set() };
+function renderCfg() {
+  const c = state.cfg;
+  c.pages.forEach(p => sel.pages.add(p.name));
+  (c.browsers.includes("chromium") ? ["chromium"] : [c.browsers[0]]).forEach(b => sel.browsers.add(b));
+  (c.languages.includes("en") ? ["en"] : [c.languages[0]]).forEach(l => sel.languages.add(l));
+  const defVp = ["iPhone 14 Pro", "iPad portrait", "Full HD"];
+  c.viewports.filter(v => defVp.includes(v.name)).forEach(v => sel.viewports.add(v.name));
+  if (sel.viewports.size === 0 && c.viewports[0]) sel.viewports.add(c.viewports[0].name);
+
+  const group = (title, key, items, labelFn, valFn) =>
+    '<div class="group"><div class="grouphead"><h4>' + title + '</h4><a data-all="' + key + '">all</a></div><div class="list' + (items.length <= 4 ? " small" : "") + '">' +
+    items.map(it => { const v = valFn(it); return '<label class="chk"><input type="checkbox" data-k="' + key + '" data-v="' + escapeHtml(v) + '" ' + (sel[key].has(v) ? "checked" : "") + '>' + escapeHtml(labelFn(it)) + '</label>'; }).join("") +
+    '</div></div>';
+
+  $("#cfg").innerHTML =
+    group("Pages", "pages", c.pages, p => p.name + "  " + p.path, p => p.name) +
+    group("Browsers", "browsers", c.browsers.map(b => ({ b })), o => o.b, o => o.b) +
+    group("Languages", "languages", c.languages.map(l => ({ l })), o => o.l, o => o.l) +
+    group("Viewports", "viewports", c.viewports, v => v.name + "  " + v.width + "×" + v.height, v => v.name);
+
+  $("#cfg").querySelectorAll("input[type=checkbox]").forEach(cb => {
+    cb.onchange = () => { cb.checked ? sel[cb.dataset.k].add(cb.dataset.v) : sel[cb.dataset.k].delete(cb.dataset.v); updateCombo(); };
+  });
+  $("#cfg").querySelectorAll("a[data-all]").forEach(a => {
+    a.onclick = (e) => { e.preventDefault(); const k = a.dataset.all;
+      const boxes = $("#cfg").querySelectorAll('input[data-k="' + k + '"]');
+      const allOn = [...boxes].every(b => b.checked);
+      boxes.forEach(b => { b.checked = !allOn; b.checked ? sel[k].add(b.dataset.v) : sel[k].delete(b.dataset.v); });
+      updateCombo(); };
+  });
+  updateCombo();
+}
+function updateCombo() {
+  const n = sel.pages.size * sel.browsers.size * sel.languages.size * sel.viewports.size;
+  $("#comboCount").textContent = sel.pages.size + " page × " + sel.browsers.size + " browser × " + sel.languages.size + " lang × " + sel.viewports.size + " viewport = " + n + " capture" + (n !== 1 ? "s" : "");
+  $("#captureBtn").disabled = n === 0;
+}
+
+function buildScanConfig() {
+  const c = state.cfg;
+  return {
+    website: c.website,
+    localeInPath: c.localeInPath,
+    pages: c.pages.filter(p => sel.pages.has(p.name)),
+    browsers: [...sel.browsers],
+    languages: [...sel.languages],
+    viewports: c.viewports.filter(v => sel.viewports.has(v.name)),
+    ai: { enabled: false } // capture only; evaluation is done separately with the model picker
+  };
+}
+
+async function startCapture() {
+  $("#captureErr").classList.add("hidden");
+  $("#galleryWrap").classList.add("hidden");
+  const btn = $("#captureBtn"); btn.disabled = true; const orig = btn.textContent;
+  btn.innerHTML = '<span class="spin"></span>Capturing…';
+  $("#captureProgress").classList.add("on");
+  setBar($("#captureFill"), $("#capturePct"), 0); $("#captureText").textContent = "Starting…";
+  try {
+    const start = await (await fetch("/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildScanConfig()) })).json();
+    if (!start.scanId) throw new Error(start.message || "Could not start capture");
+    // poll
+    while (true) {
+      await sleep(1500);
+      const p = await (await fetch("/scan/" + start.scanId)).json();
+      const pct = p.total ? Math.round((p.completed / p.total) * 100) : 0;
+      setBar($("#captureFill"), $("#capturePct"), pct);
+      $("#captureText").textContent = "Captured " + (p.completed || 0) + " of " + (p.total || "?");
+      if (p.status === "done") break;
+      if (p.status === "error") throw new Error(p.error || "Capture failed");
+    }
+    const report = await (await fetch("/report/" + start.scanId + "?format=json")).json();
+    renderGallery(report);
+    $("#captureText").textContent = "Capture complete";
+  } catch (err) {
+    $("#captureErr").textContent = "Error: " + err.message; $("#captureErr").classList.remove("hidden");
+  } finally { btn.disabled = false; btn.textContent = orig; }
+}
+
+function renderGallery(report) {
+  state.gallery = []; state.picked = new Set();
+  let codeTotal = 0, combos = 0;
+  (report.results || []).forEach(r => {
+    // In capture mode AI is off, so a result's `findings` are the free,
+    // deterministic code-check issues (overflow, alignment, clipped, …).
+    const code = (r.findings || []).filter(f => f.status !== "PASS")
+      .map(f => ({ severity: f.severity, type: f.type, category: f.category, message: f.message }));
+    codeTotal += code.length; combos++;
+    (r.screenshots || []).forEach(s => {
+      state.gallery.push({ id: uid(), rel: s.relative, screen: s.screen, code,
+        meta: { page: r.page, browser: r.browser, language: r.language, viewport: r.viewport } });
+    });
+  });
+
+  const banner = $("#codeSummary");
+  banner.innerHTML = "🔧 <b>" + codeTotal + "</b> issue" + (codeTotal !== 1 ? "s" : "") +
+    " found by free code checks across " + combos + " page/viewport combination" + (combos !== 1 ? "s" : "") +
+    " — <b>no AI used</b>." + (codeTotal ? " Evaluate below to add the AI's visual findings on top." : "");
+  banner.classList.remove("hidden");
+
+  const g = $("#gallery"); g.innerHTML = "";
+  state.gallery.forEach(item => {
+    state.picked.add(item.id);
+    const vp = item.meta.viewport || {};
+    const codeBadge = item.code.length ? '<span class="tag" style="background:rgba(34,197,94,.16);color:var(--pass);border-color:rgba(34,197,94,.4)">🔧 ' + item.code.length + '</span>' : "";
+    const div = document.createElement("div");
+    div.className = "thumb sel";
+    div.innerHTML = '<input type="checkbox" class="pick" checked data-id="' + item.id + '">' +
+      '<div class="imgwrap"><img src="/' + item.rel + '" alt="" loading="lazy"></div>' +
+      '<div class="tmeta"><div class="tname">' + escapeHtml(item.meta.page) + ' · screen ' + item.screen + '</div>' +
+      '<div class="tags"><span class="tag">' + escapeHtml(vp.name || (vp.width + "×" + vp.height)) + '</span><span class="tag">' + escapeHtml(item.meta.language) + '</span>' + codeBadge + '</div></div>';
+    div.querySelector(".pick").onchange = (e) => {
+      e.target.checked ? state.picked.add(item.id) : state.picked.delete(item.id);
+      div.classList.toggle("sel", e.target.checked); updateGalleryCount();
+    };
+    g.appendChild(div);
+  });
+  $("#galleryWrap").classList.remove("hidden");
+  updateGalleryCount();
+}
+function updateGalleryCount() {
+  const n = state.picked.size;
+  $("#galleryCount").textContent = n + " of " + state.gallery.length + " selected";
+  $("#evalCaptureBtn").disabled = n === 0 || state.selected.size === 0;
+}
+$("#selAll").onclick = e => { e.preventDefault(); $("#gallery").querySelectorAll(".pick").forEach(cb => { cb.checked = true; cb.dispatchEvent(new Event("change")); }); };
+$("#selNone").onclick = e => { e.preventDefault(); $("#gallery").querySelectorAll(".pick").forEach(cb => { cb.checked = false; cb.dispatchEvent(new Event("change")); }); };
+
+$("#evalCaptureBtn").onclick = () => {
+  const items = state.gallery.filter(g => state.picked.has(g.id)).map(g => ({
+    body: { scanRelative: g.rel, filename: g.rel.split("/").pop(), meta: g.meta },
+    preview: "/" + g.rel, name: g.meta.page + " · screen " + g.screen, code: g.code || []
+  }));
+  runAnalysis(items);
+};
+
+/* ---------- Upload panel ---------- */
+const dropzone = $("#dropzone"), fileInput = $("#fileInput"), queue = $("#queue");
+function parseFilename(name) {
+  const base = String(name).replace(/\.[a-z0-9]+$/i, "");
+  const m = /^(.*?)-(\d+)x(\d+)-([a-z]+)-(.+?)(?:-(\d+))?$/i.exec(base);
+  if (!m) return null;
+  return { page: titleize(m[1]), breakpoint: m[2] + "x" + m[3], browser: m[4], language: m[5] };
+}
+function titleize(s) { return String(s).replace(/[-_]+/g, " ").replace(/\b\w/g, c => c.toUpperCase()).trim(); }
+function readFile(file) {
+  return new Promise((resolve) => {
+    const fr = new FileReader();
+    fr.onload = () => { const dataUrl = fr.result; const img = new Image();
+      const done = (w, h) => resolve({ id: uid(), file, dataUrl, width: w, height: h, parsed: parseFilename(file.name) });
+      img.onload = () => done(img.naturalWidth, img.naturalHeight); img.onerror = () => done(0, 0); img.src = dataUrl; };
+    fr.onerror = () => resolve(null); fr.readAsDataURL(file);
+  });
+}
+async function addFiles(fileList) {
+  $("#errBanner").classList.add("hidden");
+  const imgs = [...fileList].filter(f => f.type.startsWith("image/"));
+  for (const f of imgs) { const e = await readFile(f); if (e) state.files.push(e); } // eslint-disable-line no-await-in-loop
+  renderQueue();
+}
+function renderQueue() {
+  queue.innerHTML = "";
+  state.files.forEach(entry => {
+    const p = entry.parsed;
+    const tags = p ? '<div class="tags"><span class="tag">' + escapeHtml(p.breakpoint) + '</span><span class="tag">' + escapeHtml(p.browser) + '</span><span class="tag">' + escapeHtml(p.language) + '</span></div>'
+      : '<div class="tags"><span class="tag">no filename metadata</span></div>';
+    const div = document.createElement("div");
+    div.className = "thumb";
+    div.innerHTML = '<button class="rm" title="Remove" data-id="' + entry.id + '">×</button>' +
+      '<div class="imgwrap"><img src="' + entry.dataUrl + '" alt=""></div>' +
+      '<div class="tmeta"><div class="tname">' + escapeHtml(p ? p.page : entry.file.name) + '</div>' + tags + '</div>';
+    queue.appendChild(div);
+  });
+  queue.querySelectorAll(".rm").forEach(btn => { btn.onclick = () => { state.files = state.files.filter(e => e.id !== btn.dataset.id); renderQueue(); }; });
+  refreshButtons();
+}
+function refreshButtons() {
+  const n = state.files.length;
+  $("#analyzeBtn").disabled = n === 0 || state.selected.size === 0;
+  $("#clearBtn").classList.toggle("hidden", n === 0);
+  $("#count").textContent = n ? (n + " image" + (n > 1 ? "s" : "") + " · " + state.selected.size + " model" + (state.selected.size !== 1 ? "s" : "")) : "";
+  updateGalleryCount();
+}
+function metaFor(entry) {
+  const p = entry.parsed || {};
+  const g = { page: $("#optPage").value.trim(), browser: $("#optBrowser").value.trim(), language: $("#optLang").value.trim() };
+  return { page: g.page || p.page || entry.file.name, browser: g.browser || p.browser || undefined, language: g.language || p.language || undefined,
+    viewport: { name: p.breakpoint || undefined, width: entry.width, height: entry.height } };
+}
+$("#analyzeBtn").onclick = () => {
+  const items = state.files.map(e => ({ body: { dataUrl: e.dataUrl, filename: e.file.name, meta: metaFor(e) }, preview: e.dataUrl, name: (metaFor(e).page || e.file.name), code: [] }));
+  runAnalysis(items);
+};
+$("#clearBtn").onclick = () => { state.files = []; renderQueue(); $("#output").innerHTML = ""; $("#progress").classList.remove("on"); };
+dropzone.onclick = () => fileInput.click();
+dropzone.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } };
+fileInput.onchange = () => { addFiles(fileInput.files); fileInput.value = ""; };
+["dragenter", "dragover"].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add("drag"); }));
+["dragleave", "drop"].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove("drag"); }));
+dropzone.addEventListener("drop", e => { if (e.dataTransfer.files) addFiles(e.dataTransfer.files); });
+
+/* ---------- Shared analysis + rendering ---------- */
+function setBar(fillEl, pctEl, pct) { fillEl.style.width = pct + "%"; pctEl.textContent = pct + "%"; }
+let resultsEl = null, overallEl = null, tally = null;
+function beginRun(total) {
+  $("#errBanner").classList.add("hidden"); $("#output").innerHTML = ""; overallEl = null;
+  tally = { total: 0, PASS: 0, WARNING: 0, FAIL: 0, issues: 0, code: 0 };
+  $("#progress").classList.add("on"); setBar($("#progressFill"), $("#progressPct"), 0); $("#progressText").textContent = "Starting…";
+  resultsEl = document.createElement("div"); resultsEl.className = "results";
+}
+function ensureOverall() {
+  if (!overallEl) { overallEl = document.createElement("div"); overallEl.className = "overall"; $("#output").appendChild(overallEl); $("#output").appendChild(resultsEl); }
+  const stat = (k, n, l) => '<div class="stat ' + k + '"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>';
+  overallEl.innerHTML = stat("total", tally.total, "Screenshots") + stat("pass", tally.PASS, "Best: Pass") + stat("warn", tally.WARNING, "Best: Warn") +
+    stat("fail", tally.FAIL, "Best: Fail") + stat("pass", tally.code, "🔧 Code (free)") + stat("total", tally.issues, "🤖 AI (best)") +
+    '<div style="flex:1"></div><div class="count">Models: ' + [...state.selected].join(", ") + '</div>';
+}
+async function runAnalysis(items) {
+  const providers = [...state.selected];
+  if (!providers.length) { $("#errBanner").textContent = "Pick at least one model to compare."; $("#errBanner").classList.remove("hidden"); return; }
+  const total = items.length; let done = 0;
+  beginRun(total);
+  for (const it of items) {
+    setBar($("#progressFill"), $("#progressPct"), total ? Math.round((done / total) * 100) : 0);
+    $("#progressText").textContent = "Analyzing " + it.name + " (" + (done + 1) + "/" + total + ")";
+    try {
+      const res = await fetch("/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ images: [it.body], providers }) }); // eslint-disable-line no-await-in-loop
+      const data = await res.json(); // eslint-disable-line no-await-in-loop
+      if (!res.ok || data.status === "error") throw new Error(data.message || ("Request failed (" + res.status + ")"));
+      const r = data.results[0]; const bestV = r.verdict || {};
+      tally.total++; tally[bestV.overallStatus] = (tally[bestV.overallStatus] || 0) + 1;
+      tally.issues += (bestV.issues || []).length; tally.code += (it.code ? it.code.length : 0);
+      ensureOverall(); resultsEl.appendChild(renderCard(r, it.preview, it.code || []));
+    } catch (err) {
+      tally.total++; ensureOverall(); resultsEl.appendChild(renderErrorCard(it.name, err.message));
+    }
+    done++; setBar($("#progressFill"), $("#progressPct"), total ? Math.round((done / total) * 100) : 0);
+  }
+  $("#progressText").textContent = "Done — analyzed " + done + " of " + total;
+}
+function summarize(v) {
+  const issues = (v && v.issues) || [];
+  if (v && (v.source === "error" || v.source === "unavailable")) return (issues[0] && issues[0].description) || "Model unavailable.";
+  if (!v || v.overallStatus === "PASS" || issues.length === 0) return "No user-facing UI defects detected. The layout renders as expected.";
+  const bySev = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+  issues.forEach(i => { bySev[i.severity] = (bySev[i.severity] || 0) + 1; });
+  const parts = Object.entries(bySev).filter(([, x]) => x > 0).map(([k, x]) => x + " " + k.toLowerCase());
+  return issues.length + " issue" + (issues.length > 1 ? "s" : "") + " found (" + parts.join(", ") + ").";
+}
+function statusOf(v) { return (v && (v.source === "error" || v.source === "unavailable")) ? "ERROR" : (v ? v.overallStatus : "ERROR"); }
+function dimsLine(r) {
+  const vp = r.meta.viewport || {}; const bits = [];
+  if (vp.name) bits.push(vp.name); else if (vp.width && vp.height) bits.push(vp.width + " × " + vp.height + " px");
+  if (r.meta.browser && r.meta.browser !== "n/a") bits.push(r.meta.browser);
+  if (r.meta.language) bits.push(r.meta.language);
+  return bits.join(" · ");
+}
+function buildBody(r, verdict, preview) {
+  const issues = (verdict && verdict.issues) || [];
+  const isErr = verdict && (verdict.source === "error" || verdict.source === "unavailable");
+  const boxes = isErr ? "" : issues.map((i, idx) => { if (!i.box) return ""; const b = i.box;
+    return '<div class="box ' + i.severity + '" data-idx="' + idx + '" style="left:' + b.x + '%;top:' + b.y + '%;width:' + b.width + '%;height:' + b.height + '%"><span class="tag">' + (idx + 1) + '</span></div>'; }).join("");
+  const imgSrc = "/" + r.relative;
+  const annot = '<div class="annot"><img src="' + imgSrc + '" alt="" onerror="this.src=\'' + String(preview).replace(/'/g, "%27") + '\'">' + boxes + '</div>';
+  const st = statusOf(verdict);
+  const head = '<div class="verdictline"><span class="badge ' + st + '">' + st + '</span><span class="summary">' + escapeHtml(summarize(verdict)) + '</span>' +
+    '<div class="conf">Confidence: ' + (verdict && verdict.confidence != null ? verdict.confidence + "%" : "—") + ' · model: ' + escapeHtml((verdict && verdict.source) || "—") + '</div></div>';
+  let body;
+  if (isErr) body = '<div class="ilist"><div class="errline">' + escapeHtml((issues[0] && issues[0].description) || "No result from this model.") + '</div></div>';
+  else if (issues.length) body = '<div class="ilist">' + issues.map((i, idx) => renderIssue(i, idx)).join("") + '</div>';
+  else body = '<div class="ilist"><div class="clean">✓ No issues reported by this model.</div></div>';
+  return '<div class="cbody">' + head + annot + body + '</div>';
+}
+function renderCard(r, preview, code) {
+  code = code || [];
+  const runs = r.providers || null;
+  const card = document.createElement("div"); card.className = "card";
+  const bestStatus = statusOf(r.verdict);
+  const bestIssues = (r.verdict && r.verdict.issues) ? r.verdict.issues.length : 0;
+  const prov = '<div class="dims" style="margin-top:6px">🔧 <b style="color:var(--pass)">' + code.length + '</b> free code check' + (code.length !== 1 ? "s" : "") +
+    ' · 🤖 <b style="color:var(--accent-2)">' + bestIssues + '</b> AI issue' + (bestIssues !== 1 ? "s" : "") + ' (best model)</div>';
+  const codeList = code.length
+    ? '<div style="padding:0 16px 4px">' + code.map(f => '<div class="issue" style="padding:9px 0"><div class="ihead"><span class="sev ' + (f.severity || "MEDIUM") + '">' + escapeHtml(f.severity || "MEDIUM") + '</span><span class="cat" style="border-color:rgba(34,197,94,.4);color:var(--pass)">🔧 code · ' + escapeHtml(f.type || "") + '</span><span class="ititle">' + escapeHtml(f.message || "") + '</span></div></div>').join("") + '</div>'
+    : "";
+  let tabsHtml = "", first = 0;
+  if (runs) {
+    tabsHtml = '<div class="tabs">' + runs.map((run, i) => {
+      const st = statusOf(run.verdict); const ic = (run.verdict && run.verdict.issues ? run.verdict.issues.length : 0);
+      const isBest = run.provider === r.best; if (isBest) first = i;
+      return '<div class="tab' + (isBest ? ' active' : '') + '" data-i="' + i + '"><span class="dot ' + st + '"></span>' + escapeHtml(run.label) +
+        (isBest ? ' <span class="best">★ Best</span>' : '') + (st === "ERROR" ? ' <span class="ic">n/a</span>' : ' <span class="ic">' + ic + ' issue' + (ic !== 1 ? "s" : "") + '</span>') + '</div>';
+    }).join("") + '</div>';
+  }
+  card.innerHTML = '<div class="chead"><div class="titlerow"><span class="fname">' + escapeHtml(r.filename) + '</span><span class="badge ' + bestStatus + '">' + bestStatus + '</span>' +
+    (runs ? '<span class="count" style="margin-left:4px">best of ' + runs.length + ' models</span>' : '') + '</div>' +
+    (dimsLine(r) ? '<div class="dims">' + escapeHtml(dimsLine(r)) + '</div>' : '') + prov + '</div>' + codeList + tabsHtml + '<div class="bodyhost"></div>';
+  const host = card.querySelector(".bodyhost");
+  const draw = (verdict) => {
+    host.innerHTML = buildBody(r, verdict, preview);
+    const boxEls = host.querySelectorAll(".annot .box"), issueEls = host.querySelectorAll(".issue");
+    const link = (idx, on) => { boxEls.forEach(b => { if (b.dataset.idx == idx) b.classList.toggle("on", on); }); issueEls.forEach(is => { if (is.dataset.idx == idx) is.classList.toggle("on", on); }); };
+    issueEls.forEach(is => { is.onmouseenter = () => link(is.dataset.idx, true); is.onmouseleave = () => link(is.dataset.idx, false); });
+  };
+  if (runs) {
+    draw(runs[first].verdict);
+    card.querySelectorAll(".tab").forEach(tab => { tab.onclick = () => { card.querySelectorAll(".tab").forEach(t => t.classList.remove("active")); tab.classList.add("active"); draw(runs[+tab.dataset.i].verdict); }; });
+  } else draw(r.verdict);
+  return card;
+}
+function renderIssue(i, idx) {
+  const row = (label, val) => val ? '<div class="irow"><b>' + label + ':</b> ' + escapeHtml(val) + '</div>' : "";
+  return '<div class="issue" data-idx="' + idx + '"><div class="ihead"><span class="inum">' + (idx + 1) + '</span><span class="sev ' + i.severity + '">' + i.severity + '</span>' +
+    '<span class="cat">' + escapeHtml(i.category || "") + '</span><span class="ititle">' + escapeHtml(i.title || "") + '</span><span style="flex:1"></span>' +
+    '<span style="color:var(--muted);font-size:.78rem">' + (i.confidence != null ? i.confidence + "%" : "") + '</span></div>' +
+    (i.description ? '<div class="idesc">' + escapeHtml(i.description) + '</div>' : "") + row("Location", i.location) +
+    (i.recommendation ? '<div class="rec">💡 ' + escapeHtml(i.recommendation) + '</div>' : "") + '</div>';
+}
+function renderErrorCard(name, msg) {
+  const card = document.createElement("div"); card.className = "card";
+  card.innerHTML = '<div class="chead"><div class="titlerow"><span class="fname">' + escapeHtml(name) + '</span><span class="badge ERROR">ERROR</span></div></div>' +
+    '<div class="cbody"><div class="ilist"><div class="errline">' + escapeHtml(msg) + '</div></div></div>';
+  return card;
+}
+
+$("#captureBtn").onclick = startCapture;
+loadProviders();
+loadCfg();
+</script>
+</body>
+</html>

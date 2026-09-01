@@ -1,0 +1,238 @@
+{
+  "_readme": "Files N.png map to Tharindu's issue notes N (see ISSUES.md). annotated:true = image has QA marks drawn on it (used, but a catch there is 'assisted' since the mark points at the bug). expectClean:true = a good page where ANY raised issue = false positive. pattern = case-insensitive regex tested against each issue's title+description.",
+
+  "cases": [
+    {
+      "id": "02-name-truncate-mobile",
+      "image": "cases/2.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "en", "viewport": { "name": "mobile", "width": 360, "height": 640 } },
+      "expected": [
+        { "id": "name-truncate", "category": "Text", "pattern": "(?=.*(name|title|text))(?=.*(truncat|cut off|clip|ellipsis|cropped|overflow|\\.\\.\\.))",
+          "note": "Note 2: name is cut short with '…'; should show as many characters as fit up to the edit pencil." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "03-name-wrap-two-lines",
+      "image": "cases/3.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "en", "viewport": { "name": "mobile", "width": 360, "height": 640 } },
+      "expected": [
+        { "id": "name-wrap", "category": "Text", "pattern": "(?=.*(name|title|text))(?=.*(truncat|cut off|clip|wrap|two line|second line|ellipsis|\\.\\.\\.))",
+          "note": "Note 3: if the name doesn't fit it should wrap to two lines before using '…'." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "04-checkboxes-not-inline",
+      "image": "cases/4.png",
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "hr", "viewport": { "name": "mobile", "width": 360, "height": 800 } },
+      "expected": [
+        { "id": "checkbox-align", "category": "Layout", "pattern": "(?=.*(checkbox|check box|tick box|selection box))(?=.*(align|inline|indent|left|off|misalign))",
+          "note": "Note 4: 'Select All' checkbox and the row checkboxes are not lined up." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "05-name-breaks-midword",
+      "image": "cases/5.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "hr", "viewport": { "name": "mobile", "width": 314, "height": 620 } },
+      "expected": [
+        { "id": "midword-break", "category": "Text", "pattern": "(?=.*(word|text|name))(?=.*(break|split|wrap|hyphen|mid))",
+          "note": "Note 5: a long user name splits in the middle of a word (e.g. 'ctum'); should break at spaces." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "06-name-breaks-midword-2",
+      "image": "cases/6.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "hr", "viewport": { "name": "mobile", "width": 314, "height": 620 } },
+      "expected": [
+        { "id": "midword-break", "category": "Text", "pattern": "(?=.*(word|text|name))(?=.*(break|split|wrap|hyphen|mid))",
+          "note": "Note 6: same as 5 ('condi / mentum' splits mid-word)." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "07-dropdown-cropped",
+      "image": "cases/7.png",
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "hr", "viewport": { "name": "desktop", "width": 1322, "height": 840 } },
+      "expected": [
+        { "id": "dropdown-crop", "category": "Layout", "pattern": "(?=.*(dropdown|drop-down|menu|popover|context menu))(?=.*(crop|cut|clip|hidden|overflow|behind|overlap))",
+          "note": "Note 7: the '…' action menu is cut off / hidden behind the next row." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "08-dropdown-cropped-ar",
+      "image": "cases/8.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "ar", "viewport": { "name": "desktop", "width": 1322, "height": 840 } },
+      "expected": [
+        { "id": "dropdown-crop", "category": "Layout", "pattern": "(?=.*(dropdown|drop-down|menu|popover|context menu))(?=.*(crop|cut|clip|hidden|overflow|off|behind))",
+          "note": "Note 8: dropdown menu cropped (Arabic / RTL)." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "09-text-over-box-ar",
+      "image": "cases/9.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "ar", "viewport": { "name": "mobile", "width": 590, "height": 840 } },
+      "expected": [
+        { "id": "text-overflow", "category": "Text", "pattern": "(overflow|outside|over the|jump|escap|out of|spill|exceed)",
+          "note": "Note 9: text jumps over / outside its box." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "10-save-button-cropped-ar",
+      "image": "cases/10.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "ar", "viewport": { "name": "mobile", "width": 590, "height": 840 } },
+      "expected": [
+        { "id": "save-btn-crop", "category": "Layout", "pattern": "(?=.*(save|button))(?=.*(crop|cut|clip|hidden|overflow|partial|off))",
+          "note": "Note 10: the save button is cropped." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "11-column-align-ar",
+      "image": "cases/11.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "ar", "viewport": { "name": "desktop", "width": 1440, "height": 700 } },
+      "expected": [
+        { "id": "col-valign", "category": "Layout", "pattern": "(?=.*align)(?=.*(vertical|column|row|top|cent))",
+          "note": "Note 11: column content not vertically aligned with sibling columns." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "12-scans-buttons-cropped-bg",
+      "image": "cases/12.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "bg", "viewport": { "name": "iPad Pro", "width": 1366, "height": 1024 } },
+      "expected": [
+        { "id": "scans-btn-crop", "category": "Layout", "pattern": "(?=.*(scan|button|download|detail|action))(?=.*(crop|cut|clip|hidden|overflow|off|partial))",
+          "note": "Note 12: scan count and the buttons are cropped (width 1200-1399)." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "13-width-different-hr",
+      "image": "cases/13.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "hr", "viewport": { "name": "iPhone 12 Pro", "width": 390, "height": 844 } },
+      "expected": [
+        { "id": "width-mismatch", "category": "Layout", "pattern": "(?=.*(width|column|space|gap|empty|blank))(?=.*(different|inconsistent|uneven|mismatch|empty|missing|blank))",
+          "note": "Note 13: column widths differ / empty gaps between rows." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "14-scans-buttons-cropped-it",
+      "image": "cases/14.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "it", "viewport": { "name": "desktop", "width": 1400, "height": 740 } },
+      "expected": [
+        { "id": "scans-btn-crop", "category": "Layout", "pattern": "(?=.*(scan|button|download|detail|action|save))(?=.*(crop|cut|clip|hidden|overflow|off|partial))",
+          "note": "Note 14: buttons / scan area cropped (width 1200-1399)." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "15-width-different-ja",
+      "image": "cases/15.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "ja", "viewport": { "name": "desktop", "width": 1399, "height": 740 } },
+      "expected": [
+        { "id": "width-mismatch", "category": "Layout", "pattern": "(?=.*(width|column|space|gap|empty|blank|scan))(?=.*(different|inconsistent|uneven|mismatch|empty|missing|blank|crop|cut))",
+          "note": "Note 15: column width different / scan column blank (width 1200-1399, Japanese)." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "16-width-different-tr",
+      "image": "cases/16.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "tr", "viewport": { "name": "desktop", "width": 1400, "height": 740 } },
+      "expected": [
+        { "id": "width-mismatch", "category": "Layout", "pattern": "(?=.*(width|column|space|gap|empty|blank|scan))(?=.*(different|inconsistent|uneven|mismatch|empty|missing|blank|crop|cut))",
+          "note": "Note 16: same as 15 (Turkish)." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "17-width-different-tr-2",
+      "image": "cases/17.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "tr", "viewport": { "name": "desktop", "width": 1601, "height": 846 } },
+      "expected": [
+        { "id": "width-mismatch", "category": "Layout", "pattern": "(?=.*(width|column|space|gap|empty|blank|scan))(?=.*(different|inconsistent|uneven|mismatch|empty|missing|blank|crop|cut))",
+          "note": "Note 17: same as 15 (Turkish, wider)." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "18-cropping-ru",
+      "image": "cases/18.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "ru", "viewport": { "name": "desktop", "width": 1301, "height": 686 } },
+      "expected": [
+        { "id": "crop", "category": "Layout", "pattern": "(?=.*(scan|button|download|detail|column|content))(?=.*(crop|cut|clip|hidden|overflow|off|partial))",
+          "note": "Note 18: cropping of scan count / buttons (Russian, width 1200-1399)." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "19-content-out-of-window-bn",
+      "image": "cases/19.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "bn", "viewport": { "name": "desktop", "width": 1200, "height": 778 } },
+      "expected": [
+        { "id": "content-escape", "category": "Layout", "pattern": "(overflow|outside|out of|escap|jump|off-screen|off screen|beyond|exceed|spill)",
+          "note": "Note 19: content jumps outside its box / the window (Bengali edit state)." }
+      ],
+      "mustNotFlag": []
+    },
+    {
+      "id": "20-emoji-breaks-buttons-ja",
+      "image": "cases/20.png",
+      "annotated": true,
+      "meta": { "page": "My QR Codes", "browser": "chrome", "language": "ja", "viewport": { "name": "list-row", "width": 1500, "height": 300 } },
+      "expected": [
+        { "id": "emoji-button-align", "category": "Layout", "pattern": "(?=.*button)(?=.*(align|misalign|shift|layout|position|gap|space))",
+          "note": "Note 20: emoji in the name pushes the row's buttons out of alignment." }
+      ],
+      "mustNotFlag": []
+    },
+
+    {
+      "id": "clean-menu-landing",
+      "image": "cases/Menu.png",
+      "expectClean": true,
+      "meta": { "page": "Menu landing", "browser": "chrome", "language": "en", "viewport": { "name": "mobile", "width": 312, "height": 2083 } },
+      "expected": [],
+      "mustNotFlag": []
+    },
+    {
+      "id": "clean-menu-inner",
+      "image": "cases/QCI-Menu-inner.png",
+      "expectClean": true,
+      "meta": { "page": "Menu inner", "browser": "chrome", "language": "en", "viewport": { "name": "mobile", "width": 312, "height": 2979 } },
+      "expected": [],
+      "mustNotFlag": []
+    },
+    {
+      "id": "clean-vcard-david",
+      "image": "cases/Background.png",
+      "expectClean": true,
+      "meta": { "page": "vCard (David Elson)", "browser": "chrome", "language": "en", "viewport": { "name": "mobile", "width": 312, "height": 1420 } },
+      "expected": [],
+      "mustNotFlag": []
+    }
+  ]
+}

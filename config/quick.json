@@ -1,0 +1,27 @@
+{
+  "website": "http://192.168.1.185:8000",
+  "localeInPath": true,
+  "pages": [
+    { "name": "Home", "path": "/" },
+    { "name": "Create", "path": "/create" },
+    { "name": "Generate", "path": "/generate" }
+  ],
+  "browsers": ["chromium"],
+  "languages": ["en"],
+  "viewports": [
+    { "name": "iPhone 14 Pro", "width": 390, "height": 844 },
+    { "name": "iPad portrait", "width": 768, "height": 1024 },
+    { "name": "Full HD", "width": 1920, "height": 1080 }
+  ],
+  "ai": {
+    "enabled": true,
+    "provider": "ollama",
+    "model": "qwen2.5vl:7b",
+    "baseURL": "http://127.0.0.1:11434",
+    "timeoutMs": 120000
+  },
+  "thresholds": {
+    "contrastAA": 4.5,
+    "contrastAALarge": 3.0
+  }
+}
