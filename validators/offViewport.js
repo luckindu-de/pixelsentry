@@ -45,6 +45,17 @@ async function run(page) {
             }
             return false;
         };
+        // Skip anything pinned to the scroller (fixed/sticky self or ancestor):
+        // it legitimately sits at edges and is not "cut off".
+        const inPinnedRegion = el => {
+            let p = el;
+            while (p && p !== document.body && p !== document.documentElement) {
+                const pos = getComputedStyle(p).position;
+                if (pos === "fixed" || pos === "sticky") return true;
+                p = p.parentElement;
+            }
+            return false;
+        };
 
         const results = [];
         for (const el of document.querySelectorAll(SEL)) {
@@ -53,7 +64,7 @@ async function run(page) {
 
             const cs = getComputedStyle(el);
             if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") continue;
-            if (cs.position === "fixed" || cs.position === "sticky") continue;
+            if (inPinnedRegion(el)) continue;
 
             // Partly visible but cut by a side edge.
             const cutRight = r.right > vw ? Math.min(r.width, r.right - vw) : 0;

@@ -8,6 +8,7 @@
     "start": "node server.js",
     "scan": "node scripts/scanCli.js",
     "benchmark": "node scripts/benchmark.js",
+    "pull:jira": "node scripts/pullJira.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

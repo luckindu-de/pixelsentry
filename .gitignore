@@ -4,3 +4,6 @@ uploads/
 *.log
 .env
 debug-shot.png
+benchmark/cases/jira/
+_srv.out
+_srv.err

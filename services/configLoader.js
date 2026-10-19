@@ -41,6 +41,30 @@ function normalizeConfig(raw) {
         throw new Error(`Config.website is not a valid URL: ${raw.website}`);
     }
 
+    // Multi-brand / multi-environment targets. The UI builds a base URL from
+    // urlTemplate (e.g. "https://{brand}.{env}.test-qr.com"); `overrides` maps a
+    // "brand.env" key to a full base URL for anything that breaks the pattern.
+    const sitesRaw = raw.sites && typeof raw.sites === "object" ? raw.sites : {};
+    const sites = {
+        urlTemplate: typeof sitesRaw.urlTemplate === "string" ? sitesRaw.urlTemplate : "",
+        brands: Array.isArray(sitesRaw.brands) ? sitesRaw.brands.map(String) : [],
+        environments: Array.isArray(sitesRaw.environments) ? sitesRaw.environments.map(String) : [],
+        overrides:
+            sitesRaw.overrides && typeof sitesRaw.overrides === "object"
+                ? sitesRaw.overrides
+                : {}
+    };
+
+    // Login config for authenticated pages (credentials come from .env).
+    const authRaw = raw.auth && typeof raw.auth === "object" ? raw.auth : {};
+    const auth = {
+        enabled: authRaw.enabled !== false,
+        loginPath: typeof authRaw.loginPath === "string" ? authRaw.loginPath : "/login",
+        emailSelector: authRaw.emailSelector || "",
+        passwordSelector: authRaw.passwordSelector || "",
+        submitSelector: authRaw.submitSelector || ""
+    };
+
     const pages = Array.isArray(raw.pages) && raw.pages.length
         ? raw.pages
         : [{ name: "Home", path: "/" }];
@@ -117,6 +141,9 @@ function normalizeConfig(raw) {
     // KV cache up front and can push a modest machine into swap (very slow).
     const numCtx = Number(ai.numCtx) || 4096;
     const ollamaMaxPixels = Number(ai.ollamaMaxPixels) || 1000000;
+    // Cloud providers (Claude/Gemini/GPT) get a larger budget than the local
+    // model, but still downscaled to keep per-image token cost down.
+    const maxPixels = Number(ai.maxPixels) || 1500000;
 
     const normalizedAi = {
         enabled: Boolean(ai.enabled),
@@ -127,7 +154,8 @@ function normalizeConfig(raw) {
         baseURL,
         timeoutMs,
         numCtx,
-        ollamaMaxPixels
+        ollamaMaxPixels,
+        maxPixels
     };
 
     const thresholds =
@@ -141,6 +169,8 @@ function normalizeConfig(raw) {
 
     return {
         website: raw.website,
+        sites,
+        auth,
         pages: normalizedPages,
         browsers,
         languages,

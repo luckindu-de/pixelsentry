@@ -30,8 +30,8 @@ async function launchBrowser(name) {
  * @param {string} language BCP-47 language tag, e.g. "en", "ja", "fr".
  * @returns {Promise<import('playwright').BrowserContext>}
  */
-async function createContext(browser, viewport, language) {
-    return browser.newContext({
+async function createContext(browser, viewport, language, options = {}) {
+    const opts = {
         viewport: {
             width: viewport.width,
             height: viewport.height
@@ -40,7 +40,12 @@ async function createContext(browser, viewport, language) {
         extraHTTPHeaders: {
             "Accept-Language": language
         }
-    });
+    };
+    // A logged-in session (cookies/localStorage) captured by services/auth.
+    // Each context is otherwise fresh (no disk cache carried between runs), so
+    // this gives authentication without stale-cache problems.
+    if (options.storageState) opts.storageState = options.storageState;
+    return browser.newContext(opts);
 }
 
 module.exports = {

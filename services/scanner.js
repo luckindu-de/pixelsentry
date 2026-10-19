@@ -1,5 +1,6 @@
 const { generateCombinations } = require("./combinationGenerator");
 const { capture } = require("../playwright/capture");
+const { login } = require("./auth");
 const findingsEngine = require("./findingsEngine");
 const analyzer = require("../ai/analyzer");
 const { createScanFolder } = require("../utils/folder");
@@ -40,13 +41,26 @@ async function runScan(config, options = {}) {
     const startedAt = new Date().toISOString();
     const results = [];
 
+    // Log in once (via the site form) so authenticated pages — dashboards,
+    // funnels, create/generate — load logged-in. Falls back to unauthenticated
+    // when no credentials are set in .env.
+    let storageState = null;
+    try {
+        const auth = await login(config.website, config);
+        if (auth && auth.ok) storageState = auth.storageState;
+    } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(`Login step failed: ${err.message}`);
+    }
+
     for (const combination of combinations) {
         let result;
         try {
             const captureResult = await capture({
                 scanFolder,
                 combination,
-                config
+                config,
+                storageState
             });
 
             // Split signals into trusted facts and DOM hints.

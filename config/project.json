@@ -1,12 +1,27 @@
 {
   "website": "https://oqg.dev.test-qr.com",
   "localeInPath": true,
+  "sites": {
+    "urlTemplate": "https://{brand}.{env}.test-qr.com",
+    "brands": ["oqg", "qci", "qga", "qgc"],
+    "environments": ["dev", "devii", "staging", "uat", "live"],
+    "overrides": {
+      "_comment": "Full base URL for any brand.env that does NOT follow the template (e.g. production). Example: \"oqg.live\": \"https://www.theqrcode.com\"."
+    }
+  },
   "pages": [
     { "name": "Home", "path": "/" },
+    { "name": "FAQ", "path": "/faq" },
+    { "name": "Plans and prices", "path": "/plans-and-prices" },
+    { "name": "Reviews", "path": "/reviews" },
+    { "name": "Contact", "path": "/contact" },
+    { "name": "Terms", "path": "/terms-and-conditions" },
+    { "name": "Privacy", "path": "/privacy-policy" },
+    { "name": "Login", "path": "/login" },
+    { "name": "Register", "path": "/register" },
+    { "name": "Cancel subscription", "path": "/cancel-subscription" },
     { "name": "Create", "path": "/create" },
-    { "name": "Generate", "path": "/generate" },
-    { "name": "QR", "path": "/qr" },
-    { "name": "Edit", "path": "/edit/REPLACE_WITH_QR_UID" }
+    { "name": "Generate", "path": "/generate" }
   ],
   "browsers": ["chromium"],
   "languages": [
@@ -87,6 +102,13 @@
     { "name": "QHD", "width": 2560, "height": 1440 },
     { "name": "4K UHD", "width": 3840, "height": 2160 }
   ],
+  "auth": {
+    "enabled": true,
+    "loginPath": "/login",
+    "emailSelector": "",
+    "passwordSelector": "",
+    "submitSelector": ""
+  },
   "ai": {
     "enabled": true,
     "provider": "ollama",

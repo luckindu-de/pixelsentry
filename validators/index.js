@@ -26,6 +26,7 @@ const contrast = require("./contrast");
 const clickability = require("./clickability");
 const alignment = require("./alignment");
 const clipped = require("./clipped");
+const clippedText = require("./clippedText");
 const offViewport = require("./offViewport");
 
 const PLUGINS = [
@@ -35,6 +36,7 @@ const PLUGINS = [
     clickability,
     alignment,
     clipped,
+    clippedText,
     offViewport,
     hiddenElements,
     overlap,

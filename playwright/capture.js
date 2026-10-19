@@ -20,7 +20,7 @@ const { createCombinationFolder, screenshotBaseName } = require("../utils/folder
  * @param {object} [params.config] Normalized config (for check thresholds).
  * @returns {Promise<object>} Raw capture result.
  */
-async function capture({ scanFolder, combination, config }) {
+async function capture({ scanFolder, combination, config, storageState }) {
     const { url, browser: browserName, language, viewport } = combination;
 
     const browser = await launchBrowser(browserName);
@@ -33,7 +33,7 @@ async function capture({ scanFolder, combination, config }) {
     let result;
 
     try {
-        const context = await createContext(browser, viewport, language);
+        const context = await createContext(browser, viewport, language, { storageState });
         const page = await context.newPage();
 
         page.on("console", msg => {
@@ -98,6 +98,33 @@ async function capture({ scanFolder, combination, config }) {
         await page.waitForTimeout(800);
         const loadTime = Date.now() - start;
 
+        // Strict validation: did the requested LANGUAGE and SCREEN SIZE actually
+        // apply, or did the site redirect / fall back (e.g. ar -> en) or ignore
+        // the viewport?
+        const pageInfo = await page
+            .evaluate(() => ({
+                htmlLang: (document.documentElement.getAttribute("lang") || "").trim(),
+                pathname: location.pathname,
+                innerWidth: window.innerWidth,
+                innerHeight: window.innerHeight
+            }))
+            .catch(() => ({}));
+        const base = s => String(s || "").toLowerCase().split("-")[0];
+        const pathLocale = (pageInfo.pathname || "").split("/").filter(Boolean)[0] || "";
+        const gotLocale = config && config.localeInPath ? pathLocale : (pageInfo.htmlLang || "");
+        const localeCheck = {
+            requested: language,
+            got: gotLocale,
+            htmlLang: pageInfo.htmlLang || "",
+            ok: !gotLocale || base(gotLocale) === base(language)
+        };
+        const viewportCheck = {
+            requested: { w: viewport.width, h: viewport.height },
+            actual: { w: pageInfo.innerWidth || 0, h: pageInfo.innerHeight || 0 },
+            // innerWidth can be a scrollbar-width (~17px) smaller than requested.
+            ok: !pageInfo.innerWidth || Math.abs(pageInfo.innerWidth - viewport.width) <= 20
+        };
+
         const validators = await runValidators(page, {
             imageRequestFailures,
             config
@@ -121,7 +148,9 @@ async function capture({ scanFolder, combination, config }) {
             accessibility,
             domSummary,
             screenshots,
-            validators
+            validators,
+            localeCheck,
+            viewportCheck
         };
 
         await context.close();

@@ -59,6 +59,7 @@ app.get("/config", (req, res) => {
         const c = loadConfig();
         res.json({
             website: c.website,
+            sites: c.sites,
             localeInPath: c.localeInPath,
             pages: c.pages,
             browsers: c.browsers,

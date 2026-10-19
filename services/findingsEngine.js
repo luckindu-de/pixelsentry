@@ -255,6 +255,35 @@ function buildRuntimeFindings(capture) {
         });
     }
 
+    // Strict language validation: requested locale did not actually load.
+    if (capture.localeCheck && !capture.localeCheck.ok) {
+        const lc = capture.localeCheck;
+        findings.push({
+            status: "FAIL",
+            severity: "HIGH",
+            type: "LOCALE_MISMATCH",
+            category: "Text",
+            message:
+                `Requested language "${lc.requested}" but the page loaded as ` +
+                `"${lc.got || lc.htmlLang || "unknown"}" — the locale did not apply ` +
+                `(redirect or fallback to another language).`
+        });
+    }
+
+    // Strict screen-size validation: viewport didn't apply as requested.
+    if (capture.viewportCheck && !capture.viewportCheck.ok) {
+        const vc = capture.viewportCheck;
+        findings.push({
+            status: "WARN",
+            severity: "MEDIUM",
+            type: "VIEWPORT_MISMATCH",
+            category: "Layout",
+            message:
+                `Requested ${vc.requested.w}px wide but the page rendered at ` +
+                `${vc.actual.w}px — the screen size did not apply exactly.`
+        });
+    }
+
     return findings;
 }
 

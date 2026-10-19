@@ -11,14 +11,14 @@ const PROVIDERS = {
     ollama: { label: "Ollama (local)", free: true },
     gemini: { label: "Google Gemini", free: true },
     openai: { label: "OpenAI GPT-4o", free: false },
-    anthropic: { label: "Claude 3.5 Sonnet", free: false }
+    anthropic: { label: "Claude Sonnet", free: false }
 };
 
 const DEFAULT_MODELS = {
     ollama: "qwen2.5vl:7b",
     gemini: "gemini-3-flash-preview",
     openai: "gpt-4o",
-    anthropic: "claude-3-5-sonnet-20241022"
+    anthropic: "claude-sonnet-4-5"
 };
 
 // Gemini model names churn: free keys 404 on deprecated ids (e.g.
@@ -80,6 +80,33 @@ async function ollamaImageBase64(screenshotPath, maxPixels) {
         // If resizing fails for any reason, fall back to the original image.
     }
     return buffer.toString("base64");
+}
+
+/**
+ * Downscale an image to a pixel budget for the CLOUD providers (Claude / Gemini
+ * / GPT). Vision tokens scale with pixels, so this meaningfully cuts per-image
+ * cost while keeping layout defects legible. Returns { media, base64 }.
+ */
+async function downscaledImage(screenshotPath, maxPixels) {
+    const buffer = fs.readFileSync(screenshotPath);
+    const ext = path.extname(screenshotPath).slice(1).toLowerCase();
+    const budget = Number(maxPixels) || 1500000;
+    try {
+        // eslint-disable-next-line global-require
+        const Jimp = require("jimp");
+        const img = await Jimp.read(buffer);
+        const w = img.getWidth();
+        const h = img.getHeight();
+        if (w * h > budget) {
+            const scale = Math.sqrt(budget / (w * h));
+            img.resize(Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
+            const out = await img.getBufferAsync(Jimp.MIME_PNG);
+            return { media: "image/png", base64: out.toString("base64") };
+        }
+    } catch (err) {
+        // Fall back to the original image on any resize failure.
+    }
+    return { media: MEDIA_TYPES[ext] || "image/png", base64: buffer.toString("base64") };
 }
 
 /**
@@ -280,8 +307,8 @@ async function analyzeWithOpenAI(screenshotPath, context) {
     });
 
     const model = pickModel("openai", context.config);
-    const base64 = fs.readFileSync(screenshotPath).toString("base64");
-    const dataUrl = `data:image/png;base64,${base64}`;
+    const { media, base64 } = await downscaledImage(screenshotPath, ai.maxPixels);
+    const dataUrl = `data:${media};base64,${base64}`;
 
     const response = await client.chat.completions.create({
         model,
@@ -303,19 +330,101 @@ async function analyzeWithOpenAI(screenshotPath, context) {
     return normalizeVerdict(parseVerdict(raw), "openai");
 }
 
-async function analyzeWithAnthropic(screenshotPath, context) {
-    const ai = context.config.ai;
-    const { media, base64 } = readImage(screenshotPath);
-    const model = pickModel("anthropic", context.config);
+const ANTHROPIC_API = "https://api.anthropic.com/v1";
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+// Set once a model id is confirmed to work, so later calls skip retired ones.
+let anthropicWorkingModel = null;
+
+/**
+ * User-scoped keys (sk-ant-usr-...) are not tied to a workspace, so Anthropic
+ * requires the anthropic-workspace-id header on every request.
+ */
+function anthropicHeaders() {
+    const headers = {
+        "content-type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+    };
+    if (process.env.ANTHROPIC_WORKSPACE_ID) {
+        headers["anthropic-workspace-id"] = process.env.ANTHROPIC_WORKSPACE_ID.trim();
+    }
+    return headers;
+}
+
+/**
+ * Turn an Anthropic error response into a message a QA engineer can act on.
+ */
+function anthropicErrorMessage(status, bodyText) {
+    let type = "";
+    let message = bodyText.slice(0, 300);
+    try {
+        const parsed = JSON.parse(bodyText);
+        type = parsed.error?.type || "";
+        message = parsed.error?.message || message;
+    } catch (err) {
+        // Non-JSON body: keep the raw text.
+    }
+
+    if (status === 401) {
+        const key = process.env.ANTHROPIC_API_KEY || "";
+        // A user-scoped key (sk-ant-usr...) without a workspace id gets a
+        // misleading 401 "invalid x-api-key" on /messages — the real fix is the
+        // workspace id, not a new key.
+        if (key.startsWith("sk-ant-usr") && !process.env.ANTHROPIC_WORKSPACE_ID) {
+            return "This Claude key is user-scoped and needs a workspace. Set " +
+                "ANTHROPIC_WORKSPACE_ID in .env (Console > Settings > Workspaces), or use " +
+                "a workspace API key (sk-ant-api...).";
+        }
+        return "Claude API key was rejected (invalid or revoked). Create a new key at " +
+            "console.anthropic.com and update ANTHROPIC_API_KEY in .env.";
+    }
+    if (status === 400 && /workspace/i.test(message)) {
+        return "This Claude key is user-scoped and needs a workspace. Set " +
+            "ANTHROPIC_WORKSPACE_ID in .env (Console > Settings > Workspaces), or use " +
+            "a workspace API key (sk-ant-api...).";
+    }
+    if (status === 402 || /credit balance|billing/i.test(message)) {
+        return "Claude account has no credits. Add credits at console.anthropic.com > Billing.";
+    }
+    if (status === 403) {
+        return `Claude key lacks permission for this request: ${message}`;
+    }
+    if (status === 404 || type === "not_found_error") {
+        return `Claude model unavailable: ${message}`;
+    }
+    if (status === 429) {
+        return `Claude rate limit reached; try again shortly. (${message})`;
+    }
+    return `Anthropic HTTP ${status}: ${message}`;
+}
+
+/**
+ * Newest model the key can use, preferring Sonnet. Used when the configured
+ * model has been retired.
+ */
+async function discoverAnthropicModel(timeoutMs) {
+    const response = await fetch(`${ANTHROPIC_API}/models?limit=100`, {
+        headers: anthropicHeaders(),
+        signal: AbortSignal.timeout(timeoutMs)
+    });
+    if (!response.ok) {
+        throw new Error(anthropicErrorMessage(response.status, await response.text()));
+    }
+    const models = (await response.json()).data || [];
+    const byNewest = [...models].sort(
+        (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    );
+    const sonnet = byNewest.find(m => /sonnet/i.test(m.id));
+    const chosen = sonnet || byNewest[0];
+    if (!chosen) throw new Error("No Claude models are available for this API key.");
+    return chosen.id;
+}
+
+async function anthropicMessage(model, media, base64, context, timeoutMs) {
+    return fetch(`${ANTHROPIC_API}/messages`, {
         method: "POST",
-        headers: {
-            "content-type": "application/json",
-            "x-api-key": process.env.ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01"
-        },
-        signal: AbortSignal.timeout(ai.timeoutMs),
+        headers: anthropicHeaders(),
+        signal: AbortSignal.timeout(timeoutMs),
         body: JSON.stringify({
             model,
             max_tokens: 2048,
@@ -335,11 +444,27 @@ async function analyzeWithAnthropic(screenshotPath, context) {
             ]
         })
     });
+}
+
+async function analyzeWithAnthropic(screenshotPath, context) {
+    const ai = context.config.ai;
+    const { media, base64 } = await downscaledImage(screenshotPath, ai.maxPixels);
+    let model = anthropicWorkingModel || pickModel("anthropic", context.config);
+
+    let response = await anthropicMessage(model, media, base64, context, ai.timeoutMs);
+
+    if (response.status === 404) {
+        const retired = model;
+        model = await discoverAnthropicModel(ai.timeoutMs);
+        if (model !== retired) {
+            response = await anthropicMessage(model, media, base64, context, ai.timeoutMs);
+        }
+    }
 
     if (!response.ok) {
-        const body = await response.text();
-        throw new Error(`Anthropic HTTP ${response.status}: ${body.slice(0, 300)}`);
+        throw new Error(anthropicErrorMessage(response.status, await response.text()));
     }
+    anthropicWorkingModel = model;
 
     const result = await response.json();
     const raw = Array.isArray(result.content)
@@ -377,7 +502,7 @@ async function geminiGenerate(model, key, requestBody, timeoutMs) {
 async function analyzeWithGemini(screenshotPath, context) {
     const ai = context.config.ai;
     const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    const { media, base64 } = readImage(screenshotPath);
+    const { media, base64 } = await downscaledImage(screenshotPath, ai.maxPixels);
 
     // Try the cached winner, then the configured/.env model, then fallbacks.
     // A 404 (deprecated/unsupported) or 429 (per-model quota) advances to the

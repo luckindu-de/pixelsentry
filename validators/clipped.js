@@ -33,6 +33,18 @@ async function run(page) {
             const t = (el.textContent || "").trim().slice(0, 24);
             return (t ? `"${t}" ` : "the ") + noun(el.tagName.toLowerCase());
         };
+        // A fixed/sticky element (or anything inside one) is pinned to the
+        // scroller and legitimately sits at edges / overlays scrolling content,
+        // so ancestor-rect clipping math produces false positives. Skip them.
+        const inPinnedRegion = el => {
+            let p = el;
+            while (p && p !== document.body && p !== document.documentElement) {
+                const pos = getComputedStyle(p).position;
+                if (pos === "fixed" || pos === "sticky") return true;
+                p = p.parentElement;
+            }
+            return false;
+        };
 
         const results = [];
 
@@ -42,9 +54,9 @@ async function run(page) {
 
             const cs = getComputedStyle(el);
             if (cs.visibility === "hidden" || cs.display === "none") continue;
-            // These escape an ancestor's overflow clipping, so comparing rects
-            // would produce false positives.
-            if (cs.position === "fixed" || cs.position === "sticky") continue;
+            // Fixed/sticky elements and their descendants escape ancestor
+            // clipping, so comparing rects would produce false positives.
+            if (inPinnedRegion(el)) continue;
 
             let p = el.parentElement;
             while (p && p !== document.body && p !== document.documentElement) {

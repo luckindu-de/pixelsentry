@@ -67,6 +67,9 @@
   .cfg { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px; }
   .cfg .group { border: 1px solid var(--line); border-radius: 11px; background: var(--panel); padding: 12px; }
   .cfg .group h4 { margin: 0 0 8px; font-size: .82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .cfg .group select, .cfg .group textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); border-radius: 9px; padding: 9px 11px; font-size: .9rem; }
+  .cfg .group textarea { resize: vertical; font-family: ui-monospace, monospace; line-height: 1.5; }
+  .cfg .group select:focus, .cfg .group textarea:focus { outline: none; border-color: var(--accent-2); }
   .cfg .list { max-height: 168px; overflow: auto; display: flex; flex-direction: column; gap: 5px; }
   .cfg .list.small { max-height: none; }
   .chk { display: flex; align-items: center; gap: 8px; font-size: .88rem; cursor: pointer; padding: 2px 3px; border-radius: 6px; }
@@ -140,7 +143,12 @@
 
   .annot { position: relative; flex: none; width: 340px; max-width: 100%; border: 1px solid var(--line);
     border-radius: 10px; overflow: hidden; background: var(--panel-2); align-self: flex-start; }
-  .annot img { width: 100%; display: block; }
+  .annot img { width: 100%; display: block; cursor: zoom-in; }
+  .thumb .imgwrap img { cursor: zoom-in; }
+  #lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.88); display: none; z-index: 1000; align-items: center; justify-content: center; cursor: zoom-out; padding: 24px; }
+  #lightbox.on { display: flex; }
+  #lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+  #lightbox .hint { position: fixed; top: 14px; right: 18px; color: #cbd5e1; font-size: .8rem; }
   .annot .box { position: absolute; border: 2px solid var(--warn); border-radius: 4px; box-shadow: 0 0 0 2px rgba(0,0,0,.25); pointer-events: none; }
   .annot .box .tag { position: absolute; top: -11px; left: -11px; width: 22px; height: 22px; border-radius: 50%;
     background: var(--warn); color: #06121a; font-weight: 800; font-size: .72rem; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
@@ -202,6 +210,7 @@
   <!-- CAPTURE PANEL -->
   <div class="panel active" id="panel-capture">
     <div class="website" id="website">Loading site config…</div>
+    <div class="cfg" id="sitePicker" style="margin-bottom:12px"></div>
     <div class="cfg" id="cfg"></div>
     <div class="actions">
       <button class="primary" id="captureBtn" disabled>Capture screenshots</button>
@@ -260,6 +269,8 @@
   <div class="banner err hidden" id="errBanner"></div>
   <div id="output"></div>
 
+  <div id="lightbox" title="Click to close"><span class="hint">click anywhere to close</span><img alt="full screenshot" /></div>
+
   <div class="foot">
     <div style="font-weight:600;color:var(--text)">PixelSentry</div>
     <div style="margin-top:3px">© 2026 Luckindu Dissanayake | QA Engineer</div>
@@ -289,7 +300,11 @@ async function loadProviders() {
   try {
     const data = await (await fetch("/providers")).json();
     state.providers = data.providers || [];
-    state.providers.forEach(p => { if (p.available) state.selected.add(p.name); });
+    // Default to ONE model (prefer Claude → Gemini → GPT → local) to save
+    // tokens; the QA can tick more to compare.
+    const pref = ["anthropic", "gemini", "openai", "ollama"];
+    const best = pref.find(name => state.providers.some(p => p.name === name && p.available));
+    if (best) state.selected.add(best);
     renderModels();
   } catch (err) { $("#models").innerHTML = '<span class="count">Could not load providers: ' + escapeHtml(err.message) + '</span>'; }
 }
@@ -313,9 +328,52 @@ async function loadCfg() {
   try {
     const c = await (await fetch("/config")).json();
     state.cfg = c;
-    $("#website").innerHTML = "Site: <b>" + escapeHtml(c.website) + "</b>" + (c.localeInPath ? " · locale in path" : "");
+    renderSitePicker();
     renderCfg();
   } catch (err) { $("#website").textContent = "Could not load site config: " + err.message; }
+}
+
+// Build the base URL for a brand+environment (override wins, else template).
+function siteBase(brand, env) {
+  const s = state.cfg.sites || {};
+  const key = brand + "." + env;
+  if (s.overrides && s.overrides[key]) return s.overrides[key];
+  if (s.urlTemplate) return s.urlTemplate.replace("{brand}", brand).replace("{env}", env);
+  return state.cfg.website;
+}
+function renderBaseUrl() {
+  const locale = state.cfg.localeInPath ? " · language is added to the path (e.g. /en/faq)" : "";
+  $("#website").innerHTML = "Testing: <b>" + escapeHtml(state.website || state.cfg.website) + "</b>" + locale;
+}
+function recomputeWebsite() { state.website = siteBase(state.brand, state.env); renderBaseUrl(); }
+function renderSitePicker() {
+  const s = state.cfg.sites || {};
+  const brands = s.brands || [], envs = s.environments || [];
+  let html = "";
+  if (brands.length && envs.length) {
+    if (!state.brand || !brands.includes(state.brand)) state.brand = brands.find(b => (state.cfg.website || "").includes("//" + b + ".")) || brands[0];
+    if (!state.env || !envs.includes(state.env)) state.env = envs.find(e => (state.cfg.website || "").includes("." + e + ".")) || envs[0];
+    const opt = (list, cur) => list.map(x => '<option' + (x === cur ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join("");
+    html += '<div class="group"><h4>Brand</h4><select id="brandSel">' + opt(brands, state.brand) + '</select></div>';
+    html += '<div class="group"><h4>Environment</h4><select id="envSel">' + opt(envs, state.env) + '</select></div>';
+  } else { state.website = state.cfg.website; }
+  html += '<div class="group" style="flex:2 1 320px"><h4>Custom paths (one per line)</h4>' +
+    '<textarea id="customPaths" rows="3" placeholder="/dashboard&#10;/funnel/mock&#10;/analytics"></textarea>' +
+    '<div style="color:var(--muted);font-size:.72rem;margin-top:5px">Paths only — the language is added automatically. Any path works, e.g. /dashboard.</div></div>';
+  $("#sitePicker").innerHTML = html;
+  const bs = $("#brandSel"), es = $("#envSel");
+  if (bs) bs.onchange = e => { state.brand = e.target.value; recomputeWebsite(); updateCombo(); };
+  if (es) es.onchange = e => { state.env = e.target.value; recomputeWebsite(); updateCombo(); };
+  $("#customPaths").oninput = () => updateCombo();
+  recomputeWebsite();
+}
+function customPathPages() {
+  const ta = $("#customPaths");
+  if (!ta || !ta.value.trim()) return [];
+  return ta.value.split("\n").map(x => x.trim()).filter(Boolean).map(p => {
+    const path = p.startsWith("/") ? p : "/" + p;
+    return { name: path, path };
+  });
 }
 const sel = { pages: new Set(), browsers: new Set(), languages: new Set(), viewports: new Set() };
 function renderCfg() {
@@ -351,17 +409,22 @@ function renderCfg() {
   updateCombo();
 }
 function updateCombo() {
-  const n = sel.pages.size * sel.browsers.size * sel.languages.size * sel.viewports.size;
-  $("#comboCount").textContent = sel.pages.size + " page × " + sel.browsers.size + " browser × " + sel.languages.size + " lang × " + sel.viewports.size + " viewport = " + n + " capture" + (n !== 1 ? "s" : "");
-  $("#captureBtn").disabled = n === 0;
+  const pageCount = sel.pages.size + customPathPages().length;
+  const n = pageCount * sel.browsers.size * sel.languages.size * sel.viewports.size;
+  $("#comboCount").textContent = pageCount + " page × " + sel.browsers.size + " browser × " + sel.languages.size + " lang × " + sel.viewports.size + " viewport = " + n + " capture" + (n !== 1 ? "s" : "");
+  $("#captureBtn").disabled = n === 0 || !state.website;
 }
 
 function buildScanConfig() {
   const c = state.cfg;
+  const preset = c.pages.filter(p => sel.pages.has(p.name));
+  const custom = customPathPages();
+  const seen = new Set(); const pages = [];
+  [...preset, ...custom].forEach(p => { if (!seen.has(p.path)) { seen.add(p.path); pages.push(p); } });
   return {
-    website: c.website,
+    website: state.website || c.website,
     localeInPath: c.localeInPath,
-    pages: c.pages.filter(p => sel.pages.has(p.name)),
+    pages,
     browsers: [...sel.browsers],
     languages: [...sel.languages],
     viewports: c.viewports.filter(v => sel.viewports.has(v.name)),
@@ -426,7 +489,7 @@ function renderGallery(report) {
     const div = document.createElement("div");
     div.className = "thumb sel";
     div.innerHTML = '<input type="checkbox" class="pick" checked data-id="' + item.id + '">' +
-      '<div class="imgwrap"><img src="/' + item.rel + '" alt="" loading="lazy"></div>' +
+      '<div class="imgwrap"><img src="/scans/' + item.rel + '" alt="" loading="lazy"></div>' +
       '<div class="tmeta"><div class="tname">' + escapeHtml(item.meta.page) + ' · screen ' + item.screen + '</div>' +
       '<div class="tags"><span class="tag">' + escapeHtml(vp.name || (vp.width + "×" + vp.height)) + '</span><span class="tag">' + escapeHtml(item.meta.language) + '</span>' + codeBadge + '</div></div>';
     div.querySelector(".pick").onchange = (e) => {
@@ -449,7 +512,7 @@ $("#selNone").onclick = e => { e.preventDefault(); $("#gallery").querySelectorAl
 $("#evalCaptureBtn").onclick = () => {
   const items = state.gallery.filter(g => state.picked.has(g.id)).map(g => ({
     body: { scanRelative: g.rel, filename: g.rel.split("/").pop(), meta: g.meta },
-    preview: "/" + g.rel, name: g.meta.page + " · screen " + g.screen, code: g.code || []
+    preview: "/scans/" + g.rel, name: g.meta.page + " · screen " + g.screen, code: g.code || []
   }));
   runAnalysis(items);
 };
@@ -643,6 +706,18 @@ function renderErrorCard(name, msg) {
 }
 
 $("#captureBtn").onclick = startCapture;
+
+// Click any screenshot (gallery thumb or result image) to open it full-size.
+(function () {
+  const lb = $("#lightbox"), lbImg = lb.querySelector("img");
+  document.addEventListener("click", (e) => {
+    const img = e.target.closest(".imgwrap img, .annot img");
+    if (img) { lbImg.src = img.currentSrc || img.src; lb.classList.add("on"); return; }
+    if (e.target.closest("#lightbox")) { lb.classList.remove("on"); lbImg.src = ""; }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { lb.classList.remove("on"); lbImg.src = ""; } });
+})();
+
 loadProviders();
 loadCfg();
 </script>
